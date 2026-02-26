@@ -154,8 +154,7 @@ export default function App() {
     const runNumber = selectedExperiment.runs.length + 1;
     const tempRunId = crypto.randomUUID();
 
-    const modelName =
-      models.find((m) => m.id === selectedModelId)?.name ?? models[0].name;
+    const modelName = models.find((m) => m.id === selectedModelId)?.name ?? models[0].name;
 
     const pendingRun: Run = {
       id: tempRunId,
@@ -169,18 +168,16 @@ export default function App() {
       response: "Pending response",
       score: 0,
       tags: [
-          { id: crypto.randomUUID(), label: "Accurate", weight: -1 },
-          { id: crypto.randomUUID(), label: "Concise", weight: -1 },
-          { id: crypto.randomUUID(), label: "Verbose", weight: -1 },
-          { id: crypto.randomUUID(), label: "Hallucinated", weight: -1 },
-        ], 
+        { id: crypto.randomUUID(), label: "Accurate", weight: -1 },
+        { id: crypto.randomUUID(), label: "Concise", weight: -1 },
+        { id: crypto.randomUUID(), label: "Verbose", weight: -1 },
+        { id: crypto.randomUUID(), label: "Hallucinated", weight: -1 },
+      ],
       notes: "",
     };
 
     setExperiments((prev) =>
-      prev.map((e) =>
-        e.id !== selectedExperimentId ? e : { ...e, runs: [pendingRun, ...e.runs] }
-      )
+      prev.map((e) => (e.id !== selectedExperimentId ? e : { ...e, runs: [pendingRun, ...e.runs] }))
     );
 
     setPromptValue("");
@@ -199,9 +196,7 @@ export default function App() {
       const end = performance.now();
 
       const latencySec =
-        data.totalDurationMs !== undefined
-          ? data.totalDurationMs / 1000
-          : (end - start) / 1000;
+        data.totalDurationMs !== undefined ? data.totalDurationMs / 1000 : (end - start) / 1000;
 
       setExperiments((prev) =>
         prev.map((e) => {
@@ -232,9 +227,7 @@ export default function App() {
 
           return {
             ...e,
-            runs: e.runs.map((r) =>
-              r.id === tempRunId ? { ...r, status: "error", response: message } : r
-            ),
+            runs: e.runs.map((r) => (r.id === tempRunId ? { ...r, status: "error", response: message } : r)),
           };
         })
       );
@@ -244,29 +237,32 @@ export default function App() {
   const runsCount = runs.length;
   const bestScore = runsCount ? Math.max(...runs.map((r) => r.score)) : 0;
   const avgScore = runsCount ? runs.reduce((a, r) => a + r.score, 0) / runsCount : 0;
-  const latencyAvg = runsCount
-    ? runs.reduce((a, r) => a + (r.latencySec ?? 0), 0) / runsCount
-    : 0;
+  const latencyAvg = runsCount ? runs.reduce((a, r) => a + (r.latencySec ?? 0), 0) / runsCount : 0;
+
+  const bestRunLabel = useMemo(() => {
+    if (!runs.length) return undefined;
+    const best = runs.reduce((acc, r) => (r.score > acc.score ? r : acc), runs[0]);
+    return `Run${best.runNumber}`;
+  }, [runs]);
 
   const sidebarExperiments = useMemo(() => {
-  return experiments.map((e) => ({
-    id: e.id,
-    name: e.name,
-    runCount: e.runs.length,
-    runs: e.runs.slice(0, 5).map((r) => ({
-      id: r.id,
-      modelName: r.modelName,
-      temperature: r.temperature ?? temperature,
-      tokens: r.tokens ?? maxTokens,
-      latencySec: r.latencySec ?? 0,
-      score: r.score,
-      promptPreview: r.prompt,
-      tags: (r.tags ?? []).filter((t) => (t.weight ?? -1) >= 0).map((t) => t.label),
-      hasNotes: Boolean(r.notes && r.notes.trim().length > 0),
-    })),
-  }));
-}, [experiments, temperature, maxTokens]);
-
+    return experiments.map((e) => ({
+      id: e.id,
+      name: e.name,
+      runCount: e.runs.length,
+      runs: e.runs.slice(0, 5).map((r) => ({
+        id: r.id,
+        modelName: r.modelName,
+        temperature: r.temperature ?? temperature,
+        tokens: r.tokens ?? maxTokens,
+        latencySec: r.latencySec ?? 0,
+        score: r.score,
+        promptPreview: r.prompt,
+        tags: (r.tags ?? []).filter((t) => (t.weight ?? -1) >= 0).map((t) => t.label),
+        hasNotes: Boolean(r.notes && r.notes.trim().length > 0),
+      })),
+    }));
+  }, [experiments, temperature, maxTokens]);
 
   return (
     <div className="flex h-screen w-full bg-white overflow-hidden">
@@ -311,6 +307,10 @@ export default function App() {
       <div className="flex-1 min-w-0 px-6 pt-6 flex flex-col min-h-0">
         <MainArea
           experimentName={selectedExperiment?.name ?? ""}
+          onRenameExperiment={(nextName) => {
+            if (!selectedExperimentId) return;
+            setExperiments((prev) => prev.map((e) => (e.id === selectedExperimentId ? { ...e, name: nextName } : e)));
+          }}
           models={models}
           selectedModelId={selectedModelId}
           onSelectModel={setSelectedModelId}
@@ -318,6 +318,7 @@ export default function App() {
           onModeChange={setMode}
           runsCount={runsCount}
           bestScore={Number(bestScore.toFixed(1))}
+          bestScoreRunLabel={bestRunLabel}
           latencyAvg={Number(latencyAvg.toFixed(1))}
           avgScore={Number(avgScore.toFixed(1))}
           promptValue={promptValue}
@@ -335,14 +336,20 @@ export default function App() {
           }
           onDeleteRun={(id) =>
             setExperiments((prev) =>
-              prev.map((e) =>
-                e.id !== selectedExperimentId ? e : { ...e, runs: e.runs.filter((r) => r.id !== id) }
-              )
+              prev.map((e) => (e.id !== selectedExperimentId ? e : { ...e, runs: e.runs.filter((r) => r.id !== id) }))
             )
           }
           onReuseRunParams={(id) => {
             const run = runs.find((r) => r.id === id);
-            if (run) setPromptValue(run.prompt);
+            if (!run) return;
+
+            setPromptValue(run.prompt);
+
+            if (run.temperature !== undefined) setTemperature(run.temperature);
+            if (run.tokens !== undefined) setMaxTokens(run.tokens);
+
+            const modelMatch = models.find((m) => m.name === run.modelName);
+            if (modelMatch) setSelectedModelId(modelMatch.id);
           }}
         />
       </div>

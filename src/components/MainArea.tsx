@@ -4,7 +4,6 @@ import PromptInput from "./PromptInput";
 import Dropdown from "./Dropdown";
 import ModelCard from "./ModelCard";
 import RunCard from "./RunCard";
-import ScoreSlider from "./ScoreSlider";
 import ChevronDown from "../assets/chevron-down.svg";
 
 type Mode = "Run Mode" | "Comparison Mode";
@@ -34,6 +33,7 @@ type Run = {
 
 type Props = {
   experimentName: string;
+  onRenameExperiment: (nextName: string) => void;
 
   models: Model[];
   selectedModelId: string;
@@ -44,6 +44,7 @@ type Props = {
 
   runsCount: number;
   bestScore: number;
+  bestScoreRunLabel?: string;
   latencyAvg: number;
   avgScore: number;
 
@@ -84,8 +85,51 @@ function summarize(a: Run | null, b: Run | null) {
   return parts.join("  |  ");
 }
 
+function selectedTagLabels(run: Run) {
+  return (run.tags ?? [])
+    .filter((t) => (t.weight ?? -1) >= 0 && (t.weight ?? 0) > 0)
+    .map((t) => t.label);
+}
+
+function NumField({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      inputMode="decimal"
+      placeholder={placeholder}
+      className="
+        w-[90px]
+        rounded-[10px]
+        border border-ui-black/50
+        bg-white
+        px-[12px] py-[10px]
+        text-[14px] font-normal text-ui-black
+        outline-none
+        placeholder:text-ui-grey
+      "
+    />
+  );
+}
+
+function parseNum(v: string): number | null {
+  const trimmed = v.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : null;
+}
+
 export default function MainArea({
   experimentName,
+  onRenameExperiment,
   models,
   selectedModelId,
   onSelectModel,
@@ -93,6 +137,7 @@ export default function MainArea({
   onModeChange,
   runsCount,
   bestScore,
+  bestScoreRunLabel,
   latencyAvg,
   avgScore,
   promptValue,
@@ -105,42 +150,52 @@ export default function MainArea({
 }: Props) {
   useMemo(() => models.find((m) => m.id === selectedModelId) ?? models[0], [models, selectedModelId]);
 
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(experimentName);
+
+  useEffect(() => {
+    setNameDraft(experimentName);
+  }, [experimentName]);
+
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const modelNameOptions = useMemo(() => {
     const unique = Array.from(new Set(runs.map((r) => r.modelName)));
     unique.sort((a, b) => a.localeCompare(b));
-    return ["All", ...unique];
+    return unique;
   }, [runs]);
-
-  function selectedTagLabels(run: Run) {
-  return (run.tags ?? [])
-    .filter((t) => (t.weight ?? 0) > 0)
-    .map((t) => t.label);
-}
 
   const tagLabelOptions = useMemo(() => {
     const all = new Set<string>();
-
-    runs.forEach((r) => {
-      selectedTagLabels(r).forEach((label) => all.add(label));
-    });
-
+    runs.forEach((r) => selectedTagLabels(r).forEach((label) => all.add(label)));
     const unique = Array.from(all);
     unique.sort((a, b) => a.localeCompare(b));
-    return ["All", ...unique];
+    return unique;
   }, [runs]);
-  const [draftModel, setDraftModel] = useState<string>("All");
-  const [draftTag, setDraftTag] = useState<string>("All");
-  const [draftScoreMin, setDraftScoreMin] = useState<number>(0);
-  const [draftTempMin, setDraftTempMin] = useState<number>(0);
-  const [draftTokensMin, setDraftTokensMin] = useState<number>(0);
 
-  const [appliedModel, setAppliedModel] = useState<string>("All");
-  const [appliedTag, setAppliedTag] = useState<string>("All");
-  const [appliedScoreMin, setAppliedScoreMin] = useState<number>(0);
-  const [appliedTempMin, setAppliedTempMin] = useState<number>(0);
-  const [appliedTokensMin, setAppliedTokensMin] = useState<number>(0);
+  const [draftModel, setDraftModel] = useState<string>("");
+  const [draftTag, setDraftTag] = useState<string>("");
+
+  const [draftScoreMin, setDraftScoreMin] = useState<string>("");
+  const [draftScoreMax, setDraftScoreMax] = useState<string>("");
+
+  const [draftTempMin, setDraftTempMin] = useState<string>("");
+  const [draftTempMax, setDraftTempMax] = useState<string>("");
+
+  const [draftTokensMin, setDraftTokensMin] = useState<string>("");
+  const [draftTokensMax, setDraftTokensMax] = useState<string>("");
+
+  const [appliedModel, setAppliedModel] = useState<string>("");
+  const [appliedTag, setAppliedTag] = useState<string>("");
+
+  const [appliedScoreMin, setAppliedScoreMin] = useState<number | null>(null);
+  const [appliedScoreMax, setAppliedScoreMax] = useState<number | null>(null);
+
+  const [appliedTempMin, setAppliedTempMin] = useState<number | null>(null);
+  const [appliedTempMax, setAppliedTempMax] = useState<number | null>(null);
+
+  const [appliedTokensMin, setAppliedTokensMin] = useState<number | null>(null);
+  const [appliedTokensMax, setAppliedTokensMax] = useState<number | null>(null);
 
   const [didSearch, setDidSearch] = useState(false);
 
@@ -148,21 +203,35 @@ export default function MainArea({
     if (!didSearch) return runs;
 
     return runs.filter((r) => {
-      const okModel = appliedModel === "All" ? true : r.modelName === appliedModel;
-      const okTag =
-        appliedTag === "All"
-          ? true
-          : selectedTagLabels(r).some((label) => label === appliedTag);      const okScore = r.score >= appliedScoreMin;
+      const okModel = !appliedModel ? true : r.modelName === appliedModel;
+      const okTag = !appliedTag ? true : selectedTagLabels(r).some((label) => label === appliedTag);
 
-      const t = r.temperature ?? 0;
-      const okTemp = t >= appliedTempMin;
+      const score = r.score ?? 0;
+      const okScoreMin = appliedScoreMin === null ? true : score >= appliedScoreMin;
+      const okScoreMax = appliedScoreMax === null ? true : score <= appliedScoreMax;
 
-      const tok = r.tokens ?? 0;
-      const okTokens = tok >= appliedTokensMin;
+      const temp = r.temperature ?? 0;
+      const okTempMin = appliedTempMin === null ? true : temp >= appliedTempMin;
+      const okTempMax = appliedTempMax === null ? true : temp <= appliedTempMax;
 
-      return okModel && okTag && okScore && okTemp && okTokens;
+      const tokens = r.tokens ?? 0;
+      const okTokMin = appliedTokensMin === null ? true : tokens >= appliedTokensMin;
+      const okTokMax = appliedTokensMax === null ? true : tokens <= appliedTokensMax;
+
+      return okModel && okTag && okScoreMin && okScoreMax && okTempMin && okTempMax && okTokMin && okTokMax;
     });
-  }, [runs, didSearch, appliedModel, appliedTag, appliedScoreMin, appliedTempMin, appliedTokensMin]);
+  }, [
+    runs,
+    didSearch,
+    appliedModel,
+    appliedTag,
+    appliedScoreMin,
+    appliedScoreMax,
+    appliedTempMin,
+    appliedTempMax,
+    appliedTokensMin,
+    appliedTokensMax,
+  ]);
 
   const runOptions = useMemo(() => {
     return runs.map((r) => ({
@@ -217,6 +286,7 @@ export default function MainArea({
         <Dropdown
           value={mode}
           onChange={(v) => onModeChange(v)}
+          minTriggerWidth={170}
           options={[
             { value: "Run Mode" as const, label: "Run Mode" },
             { value: "Comparison Mode" as const, label: "Comparison Mode" },
@@ -226,14 +296,52 @@ export default function MainArea({
 
       <section className="flex-1 min-h-0 rounded-t-[24px] bg-ui-backgroundGrey px-6 pt-6 pb-8 flex flex-col">
         <div className="flex items-center gap-6">
-          <div className="text-[18px] font-medium text-ui-black">{experimentName}</div>
+          <div className="min-w-0">
+            {editingName ? (
+              <input
+                value={nameDraft}
+                autoFocus
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={() => {
+                  const next = nameDraft.trim();
+                  if (next) onRenameExperiment(next);
+                  setEditingName(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  if (e.key === "Escape") {
+                    setNameDraft(experimentName);
+                    setEditingName(false);
+                  }
+                }}
+                className="
+                  w-[360px] max-w-full
+                  rounded-[10px]
+                  border border-ui-black/20
+                  bg-white
+                  px-3 py-2
+                  text-[18px] font-medium text-ui-black
+                  outline-none
+                "
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingName(true)}
+                className="text-left text-[18px] font-medium text-ui-black"
+                title="Click to rename"
+              >
+                {experimentName}
+              </button>
+            )}
+          </div>
 
           <div className="h-[80px] w-[0.2px] bg-ui-black/20" />
 
           <div className="flex flex-wrap items-center gap-4">
             <OverviewStat label="Runs" value={runsCount} />
-            <OverviewStat label="Best Score" value={bestScore} />
-            <OverviewStat label="Latency" value={latencyAvg} />
+            <OverviewStat label="Best Score" value={bestScore} subLabel={bestScoreRunLabel} />
+            <OverviewStat label="Average Latency" value={latencyAvg} />
             <OverviewStat label="Average Score" value={avgScore} />
           </div>
         </div>
@@ -282,34 +390,53 @@ export default function MainArea({
                   <Dropdown
                     value={draftModel}
                     onChange={setDraftModel}
+                    placeholder="Models"
+                    minTriggerWidth={140}
                     options={modelNameOptions.map((name) => ({
                       value: name,
-                      label: name === "All" ? "Models" : name,
+                      label: name,
                     }))}
                   />
 
                   <Dropdown
                     value={draftTag}
                     onChange={setDraftTag}
+                    placeholder="Tags"
+                    minTriggerWidth={140}
                     options={tagLabelOptions.map((name) => ({
                       value: name,
-                      label: name === "All" ? "Tags" : name,
+                      label: name,
                     }))}
                   />
 
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-2">
                     <div className="text-[12px] font-normal text-ui-black">Score</div>
-                    <ScoreSlider value={draftScoreMin} onChange={setDraftScoreMin} min={0} max={9} step={0.1} />
+                    <div className="flex items-center gap-2">
+                      <div className="text-[11px] font-normal text-ui-grey">Greater than</div>
+                      <NumField value={draftScoreMin} onChange={setDraftScoreMin} placeholder="0" />
+                      <div className="text-[11px] font-normal text-ui-grey">Less than</div>
+                      <NumField value={draftScoreMax} onChange={setDraftScoreMax} placeholder="10" />
+                    </div>
                   </div>
 
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-2">
                     <div className="text-[12px] font-normal text-ui-black">Temperature</div>
-                    <ScoreSlider value={draftTempMin} onChange={setDraftTempMin} min={0} max={2} step={0.1} />
+                    <div className="flex items-center gap-2">
+                      <div className="text-[11px] font-normal text-ui-grey">Greater than</div>
+                      <NumField value={draftTempMin} onChange={setDraftTempMin} placeholder="0" />
+                      <div className="text-[11px] font-normal text-ui-grey">Less than</div>
+                      <NumField value={draftTempMax} onChange={setDraftTempMax} placeholder="2" />
+                    </div>
                   </div>
 
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-2">
                     <div className="text-[12px] font-normal text-ui-black">Tokens</div>
-                    <ScoreSlider value={draftTokensMin} onChange={setDraftTokensMin} min={0} max={4000} step={10} />
+                    <div className="flex items-center gap-2">
+                      <div className="text-[11px] font-normal text-ui-grey">Greater than</div>
+                      <NumField value={draftTokensMin} onChange={setDraftTokensMin} placeholder="0" />
+                      <div className="text-[11px] font-normal text-ui-grey">Less than</div>
+                      <NumField value={draftTokensMax} onChange={setDraftTokensMax} placeholder="4096" />
+                    </div>
                   </div>
                 </div>
 
@@ -317,17 +444,23 @@ export default function MainArea({
                   <button
                     type="button"
                     onClick={() => {
-                      setDraftModel("All");
-                      setDraftTag("All");
-                      setDraftScoreMin(0);
-                      setDraftTempMin(0);
-                      setDraftTokensMin(0);
+                      setDraftModel("");
+                      setDraftTag("");
+                      setDraftScoreMin("");
+                      setDraftScoreMax("");
+                      setDraftTempMin("");
+                      setDraftTempMax("");
+                      setDraftTokensMin("");
+                      setDraftTokensMax("");
 
-                      setAppliedModel("All");
-                      setAppliedTag("All");
-                      setAppliedScoreMin(0);
-                      setAppliedTempMin(0);
-                      setAppliedTokensMin(0);
+                      setAppliedModel("");
+                      setAppliedTag("");
+                      setAppliedScoreMin(null);
+                      setAppliedScoreMax(null);
+                      setAppliedTempMin(null);
+                      setAppliedTempMax(null);
+                      setAppliedTokensMin(null);
+                      setAppliedTokensMax(null);
 
                       setDidSearch(false);
                     }}
@@ -348,9 +481,16 @@ export default function MainArea({
                     onClick={() => {
                       setAppliedModel(draftModel);
                       setAppliedTag(draftTag);
-                      setAppliedScoreMin(draftScoreMin);
-                      setAppliedTempMin(draftTempMin);
-                      setAppliedTokensMin(draftTokensMin);
+
+                      setAppliedScoreMin(parseNum(draftScoreMin));
+                      setAppliedScoreMax(parseNum(draftScoreMax));
+
+                      setAppliedTempMin(parseNum(draftTempMin));
+                      setAppliedTempMax(parseNum(draftTempMax));
+
+                      setAppliedTokensMin(parseNum(draftTokensMin));
+                      setAppliedTokensMax(parseNum(draftTokensMax));
+
                       setDidSearch(true);
                     }}
                     className="

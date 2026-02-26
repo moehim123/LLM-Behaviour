@@ -11,6 +11,7 @@ type RunOutput = {
   response: string;
   totalDurationMs?: number;
   loadDurationMs?: number;
+  evalCount?: number; 
 };
 
 export async function runOllama(input: RunInput): Promise<RunOutput> {

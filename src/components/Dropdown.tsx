@@ -16,6 +16,8 @@ type Props<T> = {
 
   placeholder?: string;
   menuWidth?: MenuWidthMode;
+
+  minTriggerWidth?: number;
 };
 
 export default function Dropdown<T>({
@@ -24,6 +26,7 @@ export default function Dropdown<T>({
   onChange,
   placeholder = "Select",
   menuWidth = "trigger",
+  minTriggerWidth,
 }: Props<T>) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -68,6 +71,7 @@ export default function Dropdown<T>({
         aria-expanded={open}
         aria-controls={listId}
         onClick={() => setOpen((v) => !v)}
+        style={{ minWidth: minTriggerWidth }}
         className="
           inline-flex items-center justify-between
           px-[14px] py-[10px]
@@ -102,7 +106,7 @@ export default function Dropdown<T>({
           "
           style={{
             width: menuWidth === "trigger" ? triggerWidth : "max-content",
-            minWidth: triggerWidth,
+            minWidth: Math.max(triggerWidth, minTriggerWidth ?? 0),
           }}
         >
           <div

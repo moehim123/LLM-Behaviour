@@ -6,16 +6,12 @@ type Props = {
   onSave?: (value: string) => void;
 };
 
-export default function SystemPromptInput({
-  initialValue = "",
-  onSave,
-}: Props) {
+export default function SystemPromptInput({ initialValue = "", onSave }: Props) {
   const [value, setValue] = useState(initialValue);
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
     if (!value.trim()) return;
-
     setSaved(true);
     onSave?.(value);
   };
@@ -31,31 +27,36 @@ export default function SystemPromptInput({
         placeholder="System Prompt Goes Here"
         onChange={(e) => setValue(e.target.value)}
         onFocus={handleEdit}
-        className="
-          w-full h-[110px]
-          resize-none
-          rounded-[8px]
-          border border-ui-black/20
-          bg-white
-          p-3
-          font-sans
-          text-[11px]
-          leading-normal
-          outline-none
-        "
+        className={[
+          "w-full h-[110px]",
+          "resize-none",
+          "rounded-[8px]",
+          "border border-ui-black/20",
+          "bg-white",
+          "p-3",
+          "font-sans",
+          "text-[11px]",
+          "leading-normal",
+          "outline-none",
+          saved ? "text-transparent caret-transparent" : "text-ui-black",
+        ].join(" ")}
       />
 
       {saved && (
         <div
-          className="
-            pointer-events-none
-            absolute inset-0
-            p-3
-            text-[11px]
-            italic font-light
-            text-ui-black
-            whitespace-pre-wrap
-          "
+          className={[
+            "pointer-events-none",
+            "absolute inset-0",
+            "p-3",
+            "font-sans",
+            "text-[11px]",
+            "leading-normal",
+            "whitespace-pre-wrap",
+            "break-words",
+            "italic",
+            "font-light",
+            "text-ui-grey",
+          ].join(" ")}
         >
           {value}
         </div>
@@ -77,5 +78,3 @@ export default function SystemPromptInput({
     </div>
   );
 }
-
-

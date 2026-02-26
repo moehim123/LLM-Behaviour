@@ -164,7 +164,7 @@ export default function RunCard({
 
         <div className="mb-8 flex items-center gap-4">
           <div className="shrink-0">
-            <ScoreSlider value={score} onChange={(v) => onScoreChange?.(v)} min={0} max={9} step={0.1} />
+            <ScoreSlider value={score} onChange={(v) => onScoreChange?.(v)} min={0} max={10} step={0.1} />
           </div>
 
           <div className="min-w-0 flex-1">

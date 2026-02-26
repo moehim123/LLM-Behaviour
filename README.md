@@ -1,88 +1,114 @@
-# Maincode take home . LLM experiments UI
+# Maincode LLM Runner
 
-This is a lightweight experiments UI for running prompts against local Ollama models, saving experiments and runs in localStorage.
 
-Tech
-React + TypeScript + Vite
-Tailwind
-Ollama running via Docker Compose
-State persisted in browser localStorage
+## 1. Quickstart
 
-## Prerequisites
+### Prerequisites
 
-You need these installed
-Node.js 18 or newer
-Docker Desktop
+Make sure the following are installed:
 
-## 1. Start Ollama with Docker
+Docker with Docker Compose and you are logged in in your desktop 
+Node.js version 18 or newer
 
-From the project root
+### Setup and run
 
+Clone the repository and start the local services:
+
+git clone <YOUR_REPO_URL>  
+cd maincode project  
 docker compose up -d
 
-Check it is running
+Install dependencies and start the development server:
 
-curl http://localhost:11434/api/tags
-
-If you see a JSON response, Ollama is up.
-
-## 2. Pull the model you want to use
-
-The UI can call any model you have pulled into Ollama.
-Example
-
-docker exec -it ollama ollama pull llama3.2:3b
-
-Optional second model
-
-docker exec -it ollama ollama pull mistral:7b
-
-Notes about memory
-Some models require more RAM. If you see an error like “requires more system memory”, use a smaller model or increase Docker Desktop memory.
-
-## 3. Install and run the frontend
-
-npm install
+npm install  
 npm run dev
 
-Open the app
+Open the application:
 
-http://localhost:5173
 
-## How it works
+Model downloads
 
-Experiments and runs are stored in localStorage under
+There is no need to manually download models.
 
-maincode_state_v1
+When the Ollama container starts, models are fetched automatically the first time they are used. The initial request for a model may take longer due to the download. 
 
-Runs are executed by calling Ollama’s generate endpoint.
-The UI captures
-Model name
-Prompt
-System prompt if provided
-Temperature
-Max tokens
-Latency (derived from Ollama response timing)
+If you prefer to download models ahead of time, you can run: 
 
-## Troubleshooting
+docker exec -it ollama ollama pull llama3.2:3b   
+docker exec -it ollama ollama pull mistral:7b 
 
-### Request failed or 404
-Make sure Ollama is running on port 11434 and docker compose is up.
-Then confirm the frontend is calling the correct endpoint.
+---
 
-Quick check
+### 2. Architecture
 
-curl http://localhost:11434/api/tags
+The application is structured around a few simple layers.
 
-### Model not found
-Pull the model first
+The React UI renders the layout, handles interactions, and manages view state.  
+The API layer is responsible for communicating with the local backend route.  
+Ollama runs inside Docker and executes model inference.  
+Persistence is handled using localStorage for fast prototyping.
 
-docker exec -it ollama ollama pull llama3.2:3b
+Data flow
 
-### Not enough memory for a model
-Use a smaller model or increase Docker Desktop memory.
-For example llama3.2:3b is usually safer than mistral:7b on lower memory machines.
+A prompt is entered in Run Mode.  
+The UI immediately inserts a pending run for responsiveness.  
+The API helper sends the request to the backend route.  
+Ollama generates a response.  
+The run updates to complete or error.  
+User annotations such as score, tags, and notes are stored locally.
 
-## Stop services
+---
 
-docker compose down
+### 3. Design Decisions
+
+Experiment Centric Data Model
+
+The application is structured around experiments, with runs living inside an experiment rather than existing as isolated records. This allows model outputs, parameters, and evaluations to be understood within a clear context. The goal was to support future scaling where comparisons, scoring patterns, and behavioural analysis are tied to a specific line of inquiry rather than mixed globally. The experiment also acts as the logical home for a system prompt, enabling controlled testing conditions across multiple runs.
+
+Quantifiable Tagging Instead of Binary Labels
+
+Tags were designed to carry weight rather than behave as simple on or off labels. Repeated interactions increase a tag’s strength, allowing a run to be described in degrees such as “more accurate” rather than forcing a binary judgement. This opens the door for more nuanced evaluation models where qualitative observations can gradually contribute to scoring or ranking mechanisms instead of remaining purely descriptive metadata.
+
+Run Level Annotation Layer
+
+Notes and tags are attached directly to runs rather than experiments. This keeps interpretation and evaluation coupled to the exact model response that produced them. It avoids ambiguity when experiments contain many runs with different parameters or behaviours, and it mirrors how real model analysis workflows operate where each output may require independent judgement.
+
+Side by Side Comparison Layout
+
+Comparison Mode presents runs next to each other with a concise summary rather than attempting a dense analytical view. The priority was rapid cognitive scanning and quick pattern recognition. While a tabular or statistical comparison interface may be more powerful later, the current design favors immediacy and readability during exploratory testing.
+
+Overview Stats Reflect the Active Context
+
+Experiment overview statistics are positioned near the experiment identity to reinforce the idea that metrics are contextual, not global. In Comparison Mode the same region is intended to reflect the currently inspected runs, strengthening the mental model that evaluation depends on what is being examined rather than representing static historical aggregates.
+---
+
+### 4. Model Rationale
+
+Two models were selected to create a clear contrast in behavior.
+
+llama3.2:3b provides fast responses and is well suited for quick iteration.  
+mistral:7b produces stronger outputs but requires more system resources.
+
+In practice, the smaller model feels more responsive while the larger model can show noticeable latency or memory constraints depending on the machine. 
+
+---
+
+### 5. Observations and Surprises
+
+Latency variability is more visible than expected, especially on first runs or after switching models.
+
+Model failures related to memory highlight the importance of clear feedback in local tooling.
+
+Filtering interactions benefit from an explicit Search action. Without it, sliders can unintentionally hide results.
+
+---
+
+### 6. Unfinished Work
+
+Better handling for model availability and missing downloads. 
+
+Richer comparison summaries that include annotations and qualitative changes. Maybe a table overview 
+
+Export and import capabilities for experiments.
+
+Per experiment UI preferences such as remembering filters and selected models. 
