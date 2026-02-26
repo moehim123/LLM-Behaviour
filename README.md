@@ -77,10 +77,7 @@ Side by Side Comparison Layout
 
 Comparison Mode presents runs next to each other with a concise summary rather than attempting a dense analytical view. The priority was rapid cognitive scanning and quick pattern recognition. While a tabular or statistical comparison interface may be more powerful later, the current design favors immediacy and readability during exploratory testing.
 
-Overview Stats Reflect the Active Context
 
-Experiment overview statistics are positioned near the experiment identity to reinforce the idea that metrics are contextual, not global. In Comparison Mode the same region is intended to reflect the currently inspected runs, strengthening the mental model that evaluation depends on what is being examined rather than representing static historical aggregates.
----
 
 ### 4. Model Rationale
 
