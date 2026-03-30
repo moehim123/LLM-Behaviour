@@ -1,4 +1,4 @@
-# Maincode LLM Runner
+# LLM Behaviour Playground
 
 
 ## 1. Quickstart
